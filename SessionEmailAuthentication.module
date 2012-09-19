@@ -1,0 +1,64 @@
+<?php
+
+/**
+ * ProcessWire E-mail Authentication Module
+ *
+ * Allows users to log in using e-mail address rather than username.
+ *
+ * ProcessLoginForm::buildLoginForm() must be made hookable for this to work.
+ *
+ * Ideally, the hack in afterBuildLoginForm() should be removed, if/when ProcessLogin
+ * members are made public.
+ */
+class SessionEmailAuthentication extends WireData implements Module {
+  /**
+   * @return array information about this module
+   */
+  public static function getModuleInfo() {
+    return array(
+      'title' => 'E-mail Authentication', 
+      'version' => 100, 
+      'summary' => 'Enables users to log in using their e-mail address instead of username.',
+      'singular' => true, 
+      'autoload' => true, 
+    );
+  }
+
+  /**
+   * Initialize the module
+   */
+  public function init() {
+    $this->addHookBefore('Session::login', $this, 'beforeSessionLogin');
+    $this->addHookAfter('ProcessLogin::buildLoginForm', $this, 'afterBuildLoginForm');
+  }
+  
+  /**
+   * Before session processes the $name argument, find the username for the given e-mail address.
+   */
+  public function beforeSessionLogin(HookEvent $event)
+  {
+    $email = $event->argumentsByName('name');
+    $user = $this->fuel('users')->get("email=$email"); 
+    $event->setArgument('name', $user->name);
+  }
+  
+  /**
+   * Change the title on the "username" input on the login-form.
+   */
+  public function afterBuildLoginForm(HookEvent $event)
+  {
+    /**
+     * @var FieldtypeText $field
+     */
+    
+    # ugly hack here - ProcessLogin currently keeps everything private
+    $class = new ReflectionClass('ProcessLogin');
+    $property = $class->getProperty('nameField');
+    $property->setAccessible(true);
+    # end ugly hack
+    
+    $field = $property->getValue($event->object);
+    
+    $field->set('label', $this->_('E-mail Address'));
+  }
+}
